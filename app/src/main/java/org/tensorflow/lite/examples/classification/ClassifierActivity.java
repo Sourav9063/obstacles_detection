@@ -29,6 +29,7 @@ import android.view.TextureView;
 import android.view.ViewStub;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
@@ -41,6 +42,8 @@ import org.tensorflow.lite.examples.classification.env.Logger;
 import org.tensorflow.lite.examples.classification.tflite.Classifier;
 import org.tensorflow.lite.examples.classification.tflite.Classifier.Device;
 import org.tensorflow.lite.examples.classification.tflite.Classifier.Model;
+import org.tensorflow.lite.examples.classification.tflite.ClassifierFloatMobileNet;
+import org.tensorflow.lite.examples.classification.tflite.ClassifierQuantizedEfficientNet;
 
 import android.widget.ImageView;
 import android.graphics.Bitmap;
@@ -51,85 +54,101 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.PixelFormat;
+
 import java.nio.ByteBuffer;
 import java.util.OptionalDouble;
 
 public class ClassifierActivity extends CameraActivity implements OnImageAvailableListener {
-  private static final Logger LOGGER = new Logger();
-  private static final Size DESIRED_PREVIEW_SIZE = new Size(640, 480);
-  private static final float TEXT_SIZE_DIP = 10;
-  private Bitmap rgbFrameBitmap = null;
-  private long lastProcessingTimeMs;
-  private Integer sensorOrientation;
-  private Classifier classifier;
-  private BorderedText borderedText;
-  ArrayList<Float> tmpStore=new ArrayList<>();
-    ArrayList<Float> tmpmax=new ArrayList<>();
-    ArrayList<Float> tmpmin=new ArrayList<>();
-    ArrayList<Float> tmpavrg=new ArrayList<>();
+    private static final Logger LOGGER = new Logger();
+    private static final Size DESIRED_PREVIEW_SIZE = new Size(640, 480);
+    private static final float TEXT_SIZE_DIP = 10;
+    private Bitmap rgbFrameBitmap = null;
+    private long lastProcessingTimeMs;
+    private Integer sensorOrientation;
+    private Classifier classifier;
+    private BorderedText borderedText;
+    ArrayList<Float> tmpStore = new ArrayList<>();
+    ArrayList<Float> tmpmax = new ArrayList<>();
+    ArrayList<Float> tmpmin = new ArrayList<>();
+    ArrayList<Float> tmpavrg = new ArrayList<>();
 
 
+    /**
+     * Input image size of the model along x axis.
+     */
+    private int imageSizeX;
+    /**
+     * Input image size of the model along y axis.
+     */
+    private int imageSizeY;
+    private int count = 0;
+    private float maxval = 0;
+    private float minval = 100000000;
 
-    /** Input image size of the model along x axis. */
-  private int imageSizeX;
-  /** Input image size of the model along y axis. */
-  private int imageSizeY;
-  private  int count=0;
-  private float maxval=0;
-  private  float minval=100000000;
-  @Override
-  protected int getLayoutId() {
-    return R.layout.tfe_ic_camera_connection_fragment;
-  }
-
-  @Override
-  protected Size getDesiredPreviewFrameSize() {
-    return DESIRED_PREVIEW_SIZE;
-  }
-
-  @Override
-  public void onPreviewSizeChosen(final Size size, final int rotation) {
-    final float textSizePx =
-        TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
-    borderedText = new BorderedText(textSizePx);
-    borderedText.setTypeface(Typeface.MONOSPACE);
-
-    recreateClassifier(getModel(), getDevice(), getNumThreads());
-    if (classifier == null) {
-      LOGGER.e("No classifier on preview!");
-      return;
+    @Override
+    protected int getLayoutId() {
+        return R.layout.tfe_ic_camera_connection_fragment;
     }
 
-    previewWidth = size.getWidth();
-    previewHeight = size.getHeight();
+    @Override
+    protected Size getDesiredPreviewFrameSize() {
+        return DESIRED_PREVIEW_SIZE;
+    }
 
-    sensorOrientation = rotation - getScreenOrientation();
-    LOGGER.i("Camera orientation relative to screen canvas: %d", sensorOrientation);
+    @Override
+    public void onPreviewSizeChosen(final Size size, final int rotation) {
+        final float textSizePx =
+                TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
+        borderedText = new BorderedText(textSizePx);
+        borderedText.setTypeface(Typeface.MONOSPACE);
 
-    LOGGER.i("Initializing at size %dx%d", previewWidth, previewHeight);
-    rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
-  }
+        recreateClassifier(getModel(), getDevice(), getNumThreads());
+        if (classifier == null) {
+            LOGGER.e("No classifier on preview!");
+            return;
+        }
 
-  @Override
-  protected void processImage() {
-    rgbFrameBitmap.setPixels(getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight);
-    final int cropSize = Math.min(previewWidth, previewHeight);
+        previewWidth = size.getWidth();
+        previewHeight = size.getHeight();
 
-    runInBackground(
+        sensorOrientation = rotation - getScreenOrientation();
+        LOGGER.i("Camera orientation relative to screen canvas: %d", sensorOrientation);
 
-        new Runnable() {
+        LOGGER.i("Initializing at size %dx%d", previewWidth, previewHeight);
+        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
+    }
 
-          @Override
-          public void run() {
-            if (classifier != null) {
-              final long startTime = SystemClock.uptimeMillis();
-              //final List<Classifier.Recognition> results =
-              //    classifier.recognizeImage(rgbFrameBitmap, sensorOrientation);
-              final List<Classifier.Recognition> results = new ArrayList<>();
+    @Override
+    protected void processImage() {
+        rgbFrameBitmap.setPixels(getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight);
+        final int cropSize = Math.min(previewWidth, previewHeight);
 
-              float[] img_array = classifier.recognizeImage(rgbFrameBitmap, sensorOrientation);
-              count++;
+        runInBackground(
+
+                new Runnable() {
+
+                    @Override
+                    public void run() {
+                        if (classifier != null) {
+                            final long startTime = SystemClock.uptimeMillis();
+                            //final List<Classifier.Recognition> results =
+                            //    classifier.recognizeImage(rgbFrameBitmap, sensorOrientation);
+                            final List<Classifier.Recognition> results = new ArrayList<>();
+
+                            float[] img_array = classifier.recognizeImage(rgbFrameBitmap, sensorOrientation);
+
+//                            List<Classifier.Recognition> recognitions=classifier.recognizeImageObject(rgbFrameBitmap, sensorOrientation);
+//                            System.out.println(classifier.labels.size());
+
+//    for (String lebes:classifier.labels){
+//        System.out.println(lebes);
+//    }
+//                            for(Classifier.Recognition recognition:recognitions){
+//                                System.out.println(recognition.getTitle());
+//                            }
+
+                            count++;
 
 
               /*
@@ -186,7 +205,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
               }
               */
 
-              int centerPix=(int) Math.floor((img_array.length)/2);
+                            int centerPix = (int) Math.floor((img_array.length) / 2);
 //
 //            float [] sectionPix= Arrays.copyOfRange(img_array,centerPix-100,centerPix+100);
 //
@@ -196,148 +215,152 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 //              }
 //              System.out.println(sum);
 //              System.out.println(sum/sectionPix.length);
-              System.out.println(img_array[0]);
-              System.out.println(img_array[centerPix]);
-              System.out.println(img_array[img_array.length-1]);
+                            System.out.println(img_array[0]);
+                            System.out.println(img_array[centerPix]);
+                            System.out.println(img_array[img_array.length - 1]);
 //                System.out.println(img_array[65536-100]);
 
 
-              lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
-              LOGGER.v("Detect: %s", results);
+                            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+                            LOGGER.v("Detect: %s", results);
 
 
-              for(float val:img_array){
-                  if(minval>val)minval=val;
-                  if(maxval<val)maxval=val;
-              }
-                System.out.println("maxval "+maxval);
-                System.out.println("minval "+minval);
-                tmpStore.add(img_array[centerPix-256/2]);
+                            for (float val : img_array) {
+                                if (minval > val) minval = val;
+                                if (maxval < val) maxval = val;
+                            }
+                            System.out.println("maxval " + maxval);
+                            System.out.println("minval " + minval);
+                            tmpStore.add(img_array[centerPix - 256 / 2]);
 
-                tmpmax.add(maxval);
-                tmpmin.add(minval);
-                img_array[centerPix-256/2]=maxval;
+                            tmpmax.add(maxval);
+                            tmpmin.add(minval);
+                            img_array[centerPix - 256 / 2] = maxval;
+                            img_array[(centerPix - 256 / 2) - 256 * 15] = maxval;
+                            img_array[(centerPix - 256 / 2) + 256 * 15] = maxval;
+                            img_array[(centerPix - 256 / 2) - 15] = maxval;
+                            img_array[(centerPix - 256 / 2) + 15] = maxval;
 
-                        minval=100000000;
-                maxval=0;
 
-              if(count>10){
-                  float summax=0;
-                  float summin=0;
-                float sum=0;
-                       for(int i=0;i<tmpStore.size();i++) {
-                        sum+=tmpStore.get(i);
-                        summax+=tmpmax.get(i);
-                        summin+=tmpmin.get(i);
+                            minval = 100000000;
+                            maxval = 0;
 
-                       }
-                          float avrg=sum/tmpStore.size();
-                       float avrgmin=summin/tmpmin.size();
-                       float avrgmax=summax/tmpmax.size();
-                System.out.println("avrg "+avrg);
-                  System.out.println("avrgmax "+avrgmax);
-                  System.out.println("avrgmin "+avrgmin);
-                  float cal=(avrgmax+avrgmin)/4*3;
-             float  cal2=(avrgmin+avrgmax)/2;
+                            if (count > 5) {
+                                float summax = 0;
+                                float summin = 0;
+                                float sum = 0;
+                                for (int i = 0; i < tmpStore.size(); i++) {
+                                    sum += tmpStore.get(i);
+                                    summax += tmpmax.get(i);
+                                    summin += tmpmin.get(i);
 
-                System.out.println("cal "+cal);
-                System.out.println("cal2 "+cal2);
+                                }
+                                float avrg = sum / tmpStore.size();
+                                float avrgmin = summin / tmpmin.size();
+                                float avrgmax = summax / tmpmax.size();
+                                System.out.println("avrg " + avrg);
+                                System.out.println("avrgmax " + avrgmax);
+                                System.out.println("avrgmin " + avrgmin);
+                                float cal = (avrgmax + avrgmin) / 4 * 3;
+                                float cal2 = (avrgmin + avrgmax) / 2;
 
-                  System.out.println("cal "+cal);
+                                System.out.println("cal " + cal);
+                                System.out.println("cal2 " + cal2);
+
+                                System.out.println("cal " + cal);
 //                if(avrg<600&&avrg>400){
 //                  Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 //                  v.vibrate(75);
 //                }
 //                else
-                    if(avrg>=cal2 && avrg<=cal){
-                      Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                      v.vibrate(125);
-                }
-                    else if(avrg>cal){
-                      Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                      v.vibrate(200);
-                }
-                else{
-                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                    v.vibrate(50);
-                }
-
-                count=0;
-                tmpStore.clear();
-                tmpmax.clear();
-                tmpmin.clear();
-                System.out.println("200----------------------------------------------------------");
-
-              }
-
-                System.out.println(img_array.length);
+                                if (avrg >= cal2 && avrg <= cal) {
+                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                    v.vibrate(125);
+                                } else if (avrg > cal) {
+                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                    v.vibrate(150);
 
 
+                                } else {
+                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                    v.vibrate(10);
+                                }
 
-              runOnUiThread(
-                  new Runnable() {
-                    @Override
-                    public void run() {
-                      //showResultsInBottomSheet(results);
-                      showResultsInTexture(img_array, imageSizeX, imageSizeY);
-                      showFrameInfo(previewWidth + "x" + previewHeight);
-                      showCropInfo(imageSizeX + "x" + imageSizeY);
-                      showCameraResolution(cropSize + "x" + cropSize);
-                      showRotationInfo(String.valueOf(sensorOrientation));
-                      showInference(lastProcessingTimeMs + "ms");
+                                count = 0;
+                                tmpStore.clear();
+                                tmpmax.clear();
+                                tmpmin.clear();
+                                System.out.println("200----------------------------------------------------------");
+
+                            }
+
+                            System.out.println(img_array.length);
+
+
+                            runOnUiThread(
+                                    new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            //showResultsInBottomSheet(results);
+                                            showResultsInTexture(img_array, imageSizeX, imageSizeY);
+                                            showFrameInfo(previewWidth + "x" + previewHeight);
+                                            showCropInfo(imageSizeX + "x" + imageSizeY);
+                                            showCameraResolution(cropSize + "x" + cropSize);
+                                            showRotationInfo(String.valueOf(sensorOrientation));
+                                            showInference(lastProcessingTimeMs + "ms");
+                                        }
+                                    });
+                        }
+                        readyForNextImage();
                     }
-                  });
-            }
-            readyForNextImage();
-          }
-        });
-  }
-
-  @Override
-  protected void onInferenceConfigurationChanged() {
-    if (rgbFrameBitmap == null) {
-      // Defer creation until we're getting camera frames.
-      return;
-    }
-    final Device device = getDevice();
-    final Model model = getModel();
-    final int numThreads = getNumThreads();
-    runInBackground(() -> recreateClassifier(model, device, numThreads));
-  }
-
-  private void recreateClassifier(Model model, Device device, int numThreads) {
-    if (classifier != null) {
-      LOGGER.d("Closing classifier.");
-      classifier.close();
-      classifier = null;
-    }
-    if (device == Device.GPU
-        && (model == Model.QUANTIZED_MOBILENET || model == Model.QUANTIZED_EFFICIENTNET)) {
-      LOGGER.d("Not creating classifier: GPU doesn't support quantized models.");
-      runOnUiThread(
-          () -> {
-            Toast.makeText(this, R.string.tfe_ic_gpu_quant_error, Toast.LENGTH_LONG).show();
-          });
-      return;
-    }
-    try {
-      LOGGER.d(
-          "Creating classifier (model=%s, device=%s, numThreads=%d)", model, device, numThreads);
-      classifier = Classifier.create(this, model, device, numThreads);
-    } catch (IOException | IllegalArgumentException e) {
-      LOGGER.e(e, "Failed to create classifier.");
-      runOnUiThread(
-          () -> {
-            Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
-          });
-      return;
+                });
     }
 
-    // Updates the input image size.
-    imageSizeX = classifier.getImageSizeX();
-    imageSizeY = classifier.getImageSizeY();
+    @Override
+    protected void onInferenceConfigurationChanged() {
+        if (rgbFrameBitmap == null) {
+            // Defer creation until we're getting camera frames.
+            return;
+        }
+        final Device device = getDevice();
+        final Model model = getModel();
+        final int numThreads = getNumThreads();
+        runInBackground(() -> recreateClassifier(model, device, numThreads));
+    }
+
+    private void recreateClassifier(Model model, Device device, int numThreads) {
+        if (classifier != null) {
+            LOGGER.d("Closing classifier.");
+            classifier.close();
+            classifier = null;
+        }
+        if (device == Device.GPU
+                && (model == Model.QUANTIZED_MOBILENET || model == Model.QUANTIZED_EFFICIENTNET)) {
+            LOGGER.d("Not creating classifier: GPU doesn't support quantized models.");
+            runOnUiThread(
+                    () -> {
+                        Toast.makeText(this, R.string.tfe_ic_gpu_quant_error, Toast.LENGTH_LONG).show();
+                    });
+            return;
+        }
+        try {
+            LOGGER.d(
+                    "Creating classifier (model=%s, device=%s, numThreads=%d)", model, device, numThreads);
+            classifier = Classifier.create(this, model, device, numThreads);
+        } catch (IOException | IllegalArgumentException e) {
+            LOGGER.e(e, "Failed to create classifier.");
+            runOnUiThread(
+                    () -> {
+                        Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
+            return;
+        }
+
+        // Updates the input image size.
+        imageSizeX = classifier.getImageSizeX();
+        imageSizeY = classifier.getImageSizeY();
 
 //    System.out.println(classifier);
 
-  }
+    }
 }

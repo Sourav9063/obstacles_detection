@@ -23,8 +23,6 @@ import android.graphics.RectF;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.util.Log;
-import android.view.TextureView;
-import android.view.ViewStub;
 
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
@@ -35,7 +33,6 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.examples.classification.tflite.Classifier.Device;
 import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
 import org.tensorflow.lite.support.common.FileUtil;
@@ -93,7 +90,7 @@ public abstract class Classifier {
   private final Interpreter.Options tfliteOptions = new Interpreter.Options();
 
   /** Labels corresponding to the output of the vision model. */
-  private final List<String> labels;
+  public List<String> labels;
 
   /** Input image TensorBuffer. */
   private TensorImage inputImageBuffer;
@@ -278,6 +275,37 @@ public abstract class Classifier {
 
     // Gets top-k results.
     return img_array;//getTopKProbability(labeledProbability);
+  }
+
+  public List<Recognition> recognizeImageObject(final Bitmap bitmap, int sensorOrientation) {
+    // Logs this method so that it can be analyzed with systrace.
+    Trace.beginSection("recognizeImage");
+
+    Trace.beginSection("loadImage");
+    long startTimeForLoadImage = SystemClock.uptimeMillis();
+    inputImageBuffer = loadImage(bitmap, sensorOrientation);
+    long endTimeForLoadImage = SystemClock.uptimeMillis();
+    Trace.endSection();
+    Log.v(TAG, "Timecost to load the image: " + (endTimeForLoadImage - startTimeForLoadImage));
+
+    // Runs the inference call.
+    Trace.beginSection("runInference");
+    long startTimeForReference = SystemClock.uptimeMillis();
+    tflite.run(inputImageBuffer.getBuffer(), outputProbabilityBuffer.getBuffer().rewind());
+    long endTimeForReference = SystemClock.uptimeMillis();
+    Trace.endSection();
+    Log.v(TAG, "Timecost to run model inference: " + (endTimeForReference - startTimeForReference));
+
+//    float[] img_array = outputProbabilityBuffer.getFloatArray();
+
+    // Gets the map of label and probability.
+    Map<String, Float> labeledProbability =
+        new TensorLabel(labels, probabilityProcessor.process(outputProbabilityBuffer))
+            .getMapWithFloatValue();
+    Trace.endSection();
+
+    // Gets top-k results.
+    return getTopKProbability(labeledProbability);
   }
 
   /** Closes the interpreter and model to release resources. */
