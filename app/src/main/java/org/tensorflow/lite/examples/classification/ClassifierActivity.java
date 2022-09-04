@@ -23,6 +23,7 @@ import android.graphics.Typeface;
 import android.media.ImageReader.OnImageAvailableListener;
 import android.os.SystemClock;
 import android.os.Vibrator;
+import android.speech.tts.TextToSpeech;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.TextureView;
@@ -56,6 +57,7 @@ import android.graphics.RectF;
 import android.graphics.PixelFormat;
 
 import java.nio.ByteBuffer;
+import java.util.Locale;
 import java.util.OptionalDouble;
 
 public class ClassifierActivity extends CameraActivity implements OnImageAvailableListener {
@@ -67,10 +69,18 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     private Integer sensorOrientation;
     private Classifier classifier;
     private BorderedText borderedText;
-    ArrayList<Float> tmpStore = new ArrayList<>();
-    ArrayList<Float> tmpmax = new ArrayList<>();
-    ArrayList<Float> tmpmin = new ArrayList<>();
+    private TextToSpeech textToSpeech;
+    private Vibrator vibrator;
+//    ArrayList<Float> tmpStore = new ArrayList<>();
+//    ArrayList<Float> tmpmax = new ArrayList<>();
+//    ArrayList<Float> tmpmin = new ArrayList<>();
     ArrayList<Float> tmpavrg = new ArrayList<>();
+
+    float summax = 0;
+    float summin = 0;
+    float sum = 0;
+    float sumLeft = 0;
+    float sumRight = 0;
 
 
     /**
@@ -231,33 +241,32 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
                             }
                             System.out.println("maxval " + maxval);
                             System.out.println("minval " + minval);
-                            tmpStore.add(img_array[centerPix - 256 / 2]);
-
-                            tmpmax.add(maxval);
-                            tmpmin.add(minval);
+//                            tmpStore.add(img_array[centerPix - 256 / 2]);
+                            sum+=img_array[centerPix - 256 / 2];
+                            summax+=maxval;
+                            summin+=minval;
+                            sumLeft+=img_array[(centerPix - 256 / 2) + 20];
+                            sumRight+=img_array[(centerPix - 256 / 2) - 20];
+//                            tmpmax.add(maxval);
+//                            tmpmin.add(minval);
                             img_array[centerPix - 256 / 2] = maxval;
                             img_array[(centerPix - 256 / 2) - 256 * 15] = maxval;
                             img_array[(centerPix - 256 / 2) + 256 * 15] = maxval;
-                            img_array[(centerPix - 256 / 2) - 15] = maxval;
-                            img_array[(centerPix - 256 / 2) + 15] = maxval;
+                            img_array[(centerPix - 256 / 2) - 20] = maxval;
+                            img_array[(centerPix - 256 / 2) + 20] = maxval;
 
 
                             minval = 100000000;
                             maxval = 0;
+final int  maxCount=6;
+                            if (count > maxCount) {
 
-                            if (count > 5) {
-                                float summax = 0;
-                                float summin = 0;
-                                float sum = 0;
-                                for (int i = 0; i < tmpStore.size(); i++) {
-                                    sum += tmpStore.get(i);
-                                    summax += tmpmax.get(i);
-                                    summin += tmpmin.get(i);
 
-                                }
-                                float avrg = sum / tmpStore.size();
-                                float avrgmin = summin / tmpmin.size();
-                                float avrgmax = summax / tmpmax.size();
+                                float avrg = sum / maxCount;
+                                float avrgleft= sumLeft / maxCount;
+                                float avrgRight= sumRight / maxCount;
+                                float avrgmin = summin / maxCount;
+                                float avrgmax = summax / maxCount;
                                 System.out.println("avrg " + avrg);
                                 System.out.println("avrgmax " + avrgmax);
                                 System.out.println("avrgmin " + avrgmin);
@@ -274,22 +283,44 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 //                }
 //                else
                                 if (avrg >= cal2 && avrg <= cal) {
-                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                                    v.vibrate(125);
+                                    vibrator.vibrate(125);
+                                    if(!textToSpeech.isSpeaking()){
+                                        if(avrg>=cal&&avrgleft>=cal2&&avrgRight>=cal2){
+                                            textToSpeech.speak("Stop", TextToSpeech.QUEUE_FLUSH, null);
+                                        }
+                                        else if(avrgleft>=cal2&&avrgRight<cal2){
+                                            textToSpeech.speak("Caution left", TextToSpeech.QUEUE_FLUSH, null);
+                                        }
+                                        else if(avrgRight>=cal2&&avrgleft<cal2){
+                                            textToSpeech.speak("Caution right", TextToSpeech.QUEUE_FLUSH, null);
+                                        }
+                                    }
                                 } else if (avrg > cal) {
-                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                                    v.vibrate(150);
+                                   vibrator.vibrate(150);
+                                    if(!textToSpeech.isSpeaking()){
+                                        if(avrg>=cal&&avrgleft>=cal&&avrgRight>=cal){
+                                            textToSpeech.speak("Stop", TextToSpeech.QUEUE_FLUSH, null);
+                                        }
+                                        else if(avrgleft>=cal&&avrgRight<cal){
+                                            textToSpeech.speak("Obstacle left", TextToSpeech.QUEUE_FLUSH, null);
+                                        }
+                                        else if(avrgRight>=cal&&avrgleft<cal){
+                                            textToSpeech.speak("Obstacle right", TextToSpeech.QUEUE_FLUSH, null);
+                                        }
+                                    }
+
 
 
                                 } else {
-                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                                    v.vibrate(10);
+                                    vibrator.vibrate(10);
                                 }
 
                                 count = 0;
-                                tmpStore.clear();
-                                tmpmax.clear();
-                                tmpmin.clear();
+                                sum=0;
+                                summax=0;
+                                summin=0;
+                                sumLeft=0;
+                                sumRight=0;
                                 System.out.println("200----------------------------------------------------------");
 
                             }
@@ -347,6 +378,19 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
             LOGGER.d(
                     "Creating classifier (model=%s, device=%s, numThreads=%d)", model, device, numThreads);
             classifier = Classifier.create(this, model, device, numThreads);
+           vibrator= (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            textToSpeech = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+                @Override
+                public void onInit(int i) {
+
+                    // if No error is found then only it will run
+                    if(i!=TextToSpeech.ERROR){
+                        // To Choose language of speech
+                        textToSpeech.setLanguage(Locale.US);
+                    }
+                }
+            });
+
         } catch (IOException | IllegalArgumentException e) {
             LOGGER.e(e, "Failed to create classifier.");
             runOnUiThread(
