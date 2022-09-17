@@ -308,6 +308,7 @@ public abstract class Classifier {
     return getTopKProbability(labeledProbability);
   }
 
+
   /** Closes the interpreter and model to release resources. */
   public void close() {
     if (tflite != null) {

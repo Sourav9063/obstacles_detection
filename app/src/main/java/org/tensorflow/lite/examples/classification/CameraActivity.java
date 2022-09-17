@@ -19,6 +19,7 @@ package org.tensorflow.lite.examples.classification;
 import android.Manifest;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -34,6 +35,7 @@ import android.media.Image;
 import android.media.Image.Plane;
 import android.media.ImageReader;
 import android.media.ImageReader.OnImageAvailableListener;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -49,6 +51,7 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.AdapterView;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
@@ -110,6 +113,10 @@ public abstract class CameraActivity extends AppCompatActivity
   private Device device = Device.GPU;
   private int numThreads = -1;
 
+  private Button button;
+
+
+
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     LOGGER.d("onCreate " + this);
@@ -123,6 +130,9 @@ public abstract class CameraActivity extends AppCompatActivity
     } else {
       requestPermission();
     }
+
+    button = (Button) findViewById(R.id.btnDesc);
+    button.setOnClickListener(new MyOwnListener());
 
     threadsTextView = findViewById(R.id.threads);
     plusImageView = findViewById(R.id.plus);
@@ -204,6 +214,31 @@ public abstract class CameraActivity extends AppCompatActivity
     device = Device.valueOf(deviceSpinner.getSelectedItem().toString());
     numThreads = Integer.parseInt(threadsTextView.getText().toString().trim());
   }
+
+  public class MyOwnListener implements View.OnClickListener
+  {
+    // ...
+
+    @Override
+    public void onClick(View v)
+    {
+      System.out.println("Button clicked//////////////////////////////////////////////////////////////////////////////////////////////////////////");
+      String packageName = "com.sourav.object.describer";
+      Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
+      if(intent != null) {
+        System.out.println("Button clicked//////////////////////////////////////////////////////////////////////////////////////////////////////////");
+        startActivity(intent);
+
+      }
+      else {
+        System.out.println("Intent is null");
+      }
+
+
+    }
+  }
+
+
 
   protected int[] getRgbBytes() {
     imageConverter.run();
@@ -529,16 +564,12 @@ public abstract class CameraActivity extends AppCompatActivity
   }
 
   @UiThread
-  protected void showResultsInTexture(float[] img_array, int imageSizeX, int imageSizeY) {
-    float maxval = Float.NEGATIVE_INFINITY;
-    float minval = Float.POSITIVE_INFINITY;
-    for (float cur : img_array) {
-      maxval = Math.max(maxval, cur);
-      minval = Math.min(minval, cur);
-    }
+  protected void showResultsInTexture(float[] img_array,float avrgval,float maxval,float minval , int imageSizeX, int imageSizeY) {
+
+
     float multiplier = 0;
     if ((maxval - minval) > 0) multiplier = 255 / (maxval - minval);
-
+    avrgval= (float)(multiplier* (avrgval - minval));
     int[] img_normalized = new int[img_array.length];
     for (int i = 0; i < img_array.length; ++i) {
       float val = (float) (multiplier * (img_array[i] - minval));
@@ -555,7 +586,7 @@ public abstract class CameraActivity extends AppCompatActivity
       int height = imageSizeY;
 
       Canvas canvas = textureView.lockCanvas();
-      canvas.drawColor(Color.BLUE);
+      canvas.drawColor(Color.BLACK);
       Paint paint = new Paint();
       paint.setStyle(Paint.Style.FILL);
       paint.setARGB(255, 150, 150, 150);
@@ -571,7 +602,15 @@ public abstract class CameraActivity extends AppCompatActivity
           int index = (width - ii - 1) + (height - jj - 1) * width;
           if(index < img_array.length) {
             int val = img_normalized[index];
-            bitmap.setPixel(ii, jj, Color.rgb(val, val, val));
+
+            if(val>avrgval) {
+              bitmap.setPixel(ii, jj, Color.rgb(val, 0, 0));
+            }
+
+            else {
+              bitmap.setPixel(ii, jj, Color.rgb(val, val, val));
+            }
+
           }
         }
       }

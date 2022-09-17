@@ -71,7 +71,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     private BorderedText borderedText;
     private TextToSpeech textToSpeech;
     private Vibrator vibrator;
-//    ArrayList<Float> tmpStore = new ArrayList<>();
+    //    ArrayList<Float> tmpStore = new ArrayList<>();
 //    ArrayList<Float> tmpmax = new ArrayList<>();
 //    ArrayList<Float> tmpmin = new ArrayList<>();
     ArrayList<Float> tmpavrg = new ArrayList<>();
@@ -233,7 +233,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 
                             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
                             LOGGER.v("Detect: %s", results);
-
+                            System.out.println("Detect: %s" + results);
 
                             for (float val : img_array) {
                                 if (minval > val) minval = val;
@@ -242,11 +242,11 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
                             System.out.println("maxval " + maxval);
                             System.out.println("minval " + minval);
 //                            tmpStore.add(img_array[centerPix - 256 / 2]);
-                            sum+=img_array[centerPix - 256 / 2];
-                            summax+=maxval;
-                            summin+=minval;
-                            sumLeft+=img_array[(centerPix - 256 / 2) + 20];
-                            sumRight+=img_array[(centerPix - 256 / 2) - 20];
+                            sum += img_array[centerPix - 256 / 2];
+                            summax += maxval;
+                            summin += minval;
+                            sumLeft += img_array[(centerPix - 256 / 2) + 20];
+                            sumRight += img_array[(centerPix - 256 / 2) - 20];
 //                            tmpmax.add(maxval);
 //                            tmpmin.add(minval);
                             img_array[centerPix - 256 / 2] = maxval;
@@ -255,60 +255,53 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
                             img_array[(centerPix - 256 / 2) - 20] = maxval;
                             img_array[(centerPix - 256 / 2) + 20] = maxval;
 
+                            float maxval2 = maxval;
+                            float minval2 = minval;
 
                             minval = 100000000;
                             maxval = 0;
-final int  maxCount=6;
+                            final int maxCount = 7;
                             if (count > maxCount) {
 
 
                                 float avrg = sum / maxCount;
-                                float avrgleft= sumLeft / maxCount;
-                                float avrgRight= sumRight / maxCount;
+                                float avrgleft = sumLeft / maxCount;
+                                float avrgRight = sumRight / maxCount;
                                 float avrgmin = summin / maxCount;
                                 float avrgmax = summax / maxCount;
                                 System.out.println("avrg " + avrg);
                                 System.out.println("avrgmax " + avrgmax);
                                 System.out.println("avrgmin " + avrgmin);
-                                float cal = (avrgmax + avrgmin) / 4 * 3;
-                                float cal2 = (avrgmin + avrgmax) / 2;
+                                float threeFourth = (avrgmax + avrgmin) / 4 * 3;
+                                float twoForth = (avrgmin + avrgmax) / 2;
 
-                                System.out.println("cal " + cal);
-                                System.out.println("cal2 " + cal2);
+                                System.out.println("cal " + threeFourth);
+                                System.out.println("cal2 " + twoForth);
 
-                                System.out.println("cal " + cal);
-//                if(avrg<600&&avrg>400){
-//                  Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-//                  v.vibrate(75);
-//                }
-//                else
-                                if (avrg >= cal2 && avrg <= cal) {
+                                System.out.println("cal " + threeFourth);
+
+                                if ((avrg >= twoForth && avrg <= threeFourth) || (avrgleft >= twoForth && avrgleft <= threeFourth) || (avrgRight >= twoForth && avrgRight <= threeFourth)) {
                                     vibrator.vibrate(125);
-                                    if(!textToSpeech.isSpeaking()){
-                                        if(avrg>=cal&&avrgleft>=cal2&&avrgRight>=cal2){
+                                    if (!textToSpeech.isSpeaking()) {
+                                        if ((avrg >= twoForth && avrgleft >= twoForth && avrgRight >= twoForth) || avrg >= twoForth) {
                                             textToSpeech.speak("Stop", TextToSpeech.QUEUE_FLUSH, null);
-                                        }
-                                        else if(avrgleft>=cal2&&avrgRight<cal2){
+                                        } else if (avrgleft >= twoForth && avrgRight < twoForth) {
                                             textToSpeech.speak("Caution left", TextToSpeech.QUEUE_FLUSH, null);
-                                        }
-                                        else if(avrgRight>=cal2&&avrgleft<cal2){
+                                        } else if (avrgRight >= twoForth && avrgleft < twoForth) {
                                             textToSpeech.speak("Caution right", TextToSpeech.QUEUE_FLUSH, null);
                                         }
                                     }
-                                } else if (avrg > cal) {
-                                   vibrator.vibrate(150);
-                                    if(!textToSpeech.isSpeaking()){
-                                        if(avrg>=cal&&avrgleft>=cal&&avrgRight>=cal){
-                                            textToSpeech.speak("Stop", TextToSpeech.QUEUE_FLUSH, null);
-                                        }
-                                        else if(avrgleft>=cal&&avrgRight<cal){
+                                } else if (avrg > threeFourth || avrgleft > threeFourth || avrgRight > threeFourth) {
+                                    vibrator.vibrate(150);
+                                    if (!textToSpeech.isSpeaking()) {
+                                        if ((avrg >= threeFourth && avrgleft >= threeFourth && avrgRight >= threeFourth) || avrg >= threeFourth) {
+                                            textToSpeech.speak("Stop", TextToSpeech.QUEUE_FLUSH, null, "1");
+                                        } else if (avrgleft >= threeFourth && avrgRight < threeFourth) {
                                             textToSpeech.speak("Obstacle left", TextToSpeech.QUEUE_FLUSH, null);
-                                        }
-                                        else if(avrgRight>=cal&&avrgleft<cal){
+                                        } else if (avrgRight >= threeFourth && avrgleft < threeFourth) {
                                             textToSpeech.speak("Obstacle right", TextToSpeech.QUEUE_FLUSH, null);
                                         }
                                     }
-
 
 
                                 } else {
@@ -316,16 +309,14 @@ final int  maxCount=6;
                                 }
 
                                 count = 0;
-                                sum=0;
-                                summax=0;
-                                summin=0;
-                                sumLeft=0;
-                                sumRight=0;
+                                sum = 0;
+                                summax = 0;
+                                summin = 0;
+                                sumLeft = 0;
+                                sumRight = 0;
                                 System.out.println("200----------------------------------------------------------");
 
                             }
-
-                            System.out.println(img_array.length);
 
 
                             runOnUiThread(
@@ -333,7 +324,7 @@ final int  maxCount=6;
                                         @Override
                                         public void run() {
                                             //showResultsInBottomSheet(results);
-                                            showResultsInTexture(img_array, imageSizeX, imageSizeY);
+                                            showResultsInTexture(img_array, ((maxval2 + minval2) / 2), maxval2, minval2, imageSizeX, imageSizeY);
                                             showFrameInfo(previewWidth + "x" + previewHeight);
                                             showCropInfo(imageSizeX + "x" + imageSizeY);
                                             showCameraResolution(cropSize + "x" + cropSize);
@@ -378,15 +369,15 @@ final int  maxCount=6;
             LOGGER.d(
                     "Creating classifier (model=%s, device=%s, numThreads=%d)", model, device, numThreads);
             classifier = Classifier.create(this, model, device, numThreads);
-           vibrator= (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
             textToSpeech = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
                 @Override
                 public void onInit(int i) {
 
                     // if No error is found then only it will run
-                    if(i!=TextToSpeech.ERROR){
+                    if (i != TextToSpeech.ERROR) {
                         // To Choose language of speech
-                        textToSpeech.setLanguage(Locale.US);
+                        textToSpeech.setLanguage(Locale.UK);
                     }
                 }
             });
