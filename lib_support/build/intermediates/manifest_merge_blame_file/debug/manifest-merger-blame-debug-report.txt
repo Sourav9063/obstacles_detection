@@ -4,8 +4,8 @@
 4
 5    <uses-sdk
 6        android:minSdkVersion="21"
-6-->D:\Flutter Work\third_eye_andrioid\lib_support\src\main\AndroidManifest.xml
+6-->D:\Flutter Work\obstacles_detection\lib_support\src\main\AndroidManifest.xml
 7        android:targetSdkVersion="28" />
-7-->D:\Flutter Work\third_eye_andrioid\lib_support\src\main\AndroidManifest.xml
+7-->D:\Flutter Work\obstacles_detection\lib_support\src\main\AndroidManifest.xml
 8
 9</manifest>
