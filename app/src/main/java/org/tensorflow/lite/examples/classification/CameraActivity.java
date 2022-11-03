@@ -35,7 +35,6 @@ import android.media.Image;
 import android.media.Image.Plane;
 import android.media.ImageReader;
 import android.media.ImageReader.OnImageAvailableListener;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -113,7 +112,8 @@ public abstract class CameraActivity extends AppCompatActivity
   private Device device = Device.GPU;
   private int numThreads = -1;
 
-  private Button button;
+  private Button buttonDesc;
+  private Button buttonClose;
 
 
 
@@ -131,8 +131,11 @@ public abstract class CameraActivity extends AppCompatActivity
       requestPermission();
     }
 
-    button = (Button) findViewById(R.id.btnDesc);
-    button.setOnClickListener(new MyOwnListener());
+    buttonDesc = (Button) findViewById(R.id.btnDesc);
+    buttonClose =(Button)findViewById(R.id.buttonclose) ;
+
+    buttonDesc.setOnClickListener(new MyOwnListener());
+    buttonClose.setOnClickListener(new MyOwnListenerClose());
 
     threadsTextView = findViewById(R.id.threads);
     plusImageView = findViewById(R.id.plus);
@@ -234,6 +237,17 @@ public abstract class CameraActivity extends AppCompatActivity
         System.out.println("Intent is null");
       }
 
+
+    }
+  }
+
+  private class MyOwnListenerClose implements View.OnClickListener{
+
+
+    @Override
+    public void onClick(View view) {
+
+      finish();
 
     }
   }

@@ -305,6 +305,10 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 
 
                                 } else {
+
+                                    if(!textToSpeech.isSpeaking()){
+                                        textToSpeech.speak("ok", TextToSpeech.QUEUE_FLUSH, null);
+                                    }
                                     vibrator.vibrate(10);
                                 }
 
@@ -377,7 +381,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
                     // if No error is found then only it will run
                     if (i != TextToSpeech.ERROR) {
                         // To Choose language of speech
-                        textToSpeech.setLanguage(Locale.UK);
+                        textToSpeech.setLanguage(new Locale("en_GB"));
                     }
                 }
             });

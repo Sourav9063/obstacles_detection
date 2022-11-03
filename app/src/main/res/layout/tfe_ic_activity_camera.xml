@@ -62,4 +62,11 @@
         android:text="DESCRIPTION"
         app:layout_anchor="@+id/relativeLayout2"
         app:layout_anchorGravity="center" />
+
+    <Button
+        android:id="@+id/buttonclose"
+        android:layout_width="match_parent"
+        android:layout_height="125dp"
+        android:background="#85FD1C1C"
+        android:text="CLOSE" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
