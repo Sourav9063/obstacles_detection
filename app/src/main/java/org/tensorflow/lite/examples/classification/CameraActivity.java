@@ -35,6 +35,7 @@ import android.media.Image;
 import android.media.Image.Plane;
 import android.media.ImageReader;
 import android.media.ImageReader.OnImageAvailableListener;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -217,7 +218,6 @@ public abstract class CameraActivity extends AppCompatActivity
     device = Device.valueOf(deviceSpinner.getSelectedItem().toString());
     numThreads = Integer.parseInt(threadsTextView.getText().toString().trim());
   }
-
   public class MyOwnListener implements View.OnClickListener
   {
     // ...
@@ -234,8 +234,13 @@ public abstract class CameraActivity extends AppCompatActivity
 
       }
       else {
-        System.out.println("Intent is null");
+        Intent intent2 = new Intent(Intent.ACTION_VIEW , Uri.parse("https://github.com/Sourav9063/ObjectDescriber/releases/download/test/app-debug.apk"));
+        startActivity(intent2);
       }
+
+//      Intent intent =new Intent("org.tensorflow.lite.examples.objectdetection.activities.MainActivity");
+//      startActivity(intent);
+
 
 
     }
